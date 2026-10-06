@@ -139,6 +139,13 @@
                     <span class="hidden sm:inline">切換鏡頭</span>
                 </button>
 
+                <!-- Video Recording Button -->
+                <button id="btnRecordVideo" onclick="toggleVideoRecording()" class="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 active:scale-95 border border-rose-500/40 text-rose-400 hover:text-rose-300 text-xs font-bold transition shadow" title="開始錄製畫面與手部軌跡 (WebM/MP4)">
+                    <span id="recDot" class="w-2.5 h-2.5 rounded-full bg-rose-500"></span>
+                    <span id="recBtnText">錄影</span>
+                    <span id="recTimerText" class="hidden font-mono font-bold text-rose-200">00:00</span>
+                </button>
+
                 <!-- Mirror Video Toggle -->
                 <button id="btnMirror" onclick="toggleMirror()" class="p-2 rounded-xl bg-surface-800 hover:bg-surface-700 border border-slate-700 text-slate-300 transition" title="水平翻轉鏡頭 (鏡像)">
                     <i class="ph-bold ph-flip-horizontal text-base text-neon-cyan"></i>
@@ -209,6 +216,12 @@
                             <i class="ph-bold ph-arrows-clockwise text-xs"></i>
                             <span id="camCurrentLabelBadge" class="max-w-[120px] truncate">偵測鏡頭中...</span>
                         </button>
+                    </div>
+
+                    <!-- Top-Center Recording Indicator (Shown while recording) -->
+                    <div id="canvasRecIndicator" class="hidden absolute top-3 left-1/2 -translate-x-1/2 z-10 px-3 py-1 rounded-full bg-black/90 border border-rose-500 text-rose-400 flex items-center gap-2 shadow-2xl font-mono text-xs font-black animate-pulse pointer-events-none">
+                        <span class="w-2 h-2 rounded-full bg-rose-500 animate-ping"></span>
+                        <span>REC <span id="canvasRecTimer">00:00</span></span>
                     </div>
 
                     <!-- Top-Right Live Gesture HUD Card -->
@@ -420,18 +433,47 @@
                 </div>
             </div>
 
-            <!-- 3. REAL-TIME EVENT STREAM LOG -->
-            <div class="glass-panel rounded-3xl p-4 sm:p-5 border border-slate-700/80 shadow-2xl flex flex-col">
-                <div class="flex items-center justify-between border-b border-slate-800 pb-2 mb-2">
+            <!-- 3. REAL-TIME EVENT STREAM & TELEMETRY LOG -->
+            <div class="glass-panel rounded-3xl p-4 sm:p-5 border border-slate-700/80 shadow-2xl flex flex-col space-y-2.5">
+                <div class="flex items-center justify-between border-b border-slate-800 pb-2">
                     <div class="flex items-center gap-2">
-                        <i class="ph-bold ph-terminal-window text-amber-400 text-lg"></i>
-                        <h3 class="text-xs font-black uppercase tracking-wider text-slate-200">即時分析日誌串流</h3>
+                        <i class="ph-bold ph-chart-line-up text-amber-400 text-lg"></i>
+                        <h3 class="text-xs font-black uppercase tracking-wider text-slate-200">即時數據記錄與日誌匯出</h3>
                     </div>
-                    <button onclick="clearEventLogs()" class="text-[11px] text-slate-400 hover:text-white transition">
-                        清除日誌
+                    <span id="logRecordCountBadge" class="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-surface-950 text-neon-cyan border border-neon-cyan/30">
+                        0 筆數據
+                    </span>
+                </div>
+
+                <!-- Action Toolbar: Recording, Logging Toggle, CSV & JSON Export -->
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-1.5 text-xs font-bold">
+                    <!-- Toggle Telemetry Logging -->
+                    <button id="btnToggleLog" onclick="toggleTelemetryLogging()" class="flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-xl bg-surface-900 hover:bg-surface-800 border border-slate-700 text-slate-200 transition" title="暫停或繼續記錄數據">
+                        <span id="logStatusDot" class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                        <span id="textToggleLog">記錄中</span>
+                    </button>
+
+                    <!-- Export CSV -->
+                    <button onclick="exportLogAsCSV()" class="flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 active:scale-95 border border-emerald-500/40 text-emerald-300 transition" title="匯出 CSV 格式 (Excel/試算表適用)">
+                        <i class="ph-bold ph-file-csv text-base"></i>
+                        <span>匯出 CSV</span>
+                    </button>
+
+                    <!-- Export JSON -->
+                    <button onclick="exportLogAsJSON()" class="flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-xl bg-neon-cyan/15 hover:bg-neon-cyan/25 active:scale-95 border border-neon-cyan/40 text-neon-cyan transition" title="匯出 JSON 完整分析檔">
+                        <i class="ph-bold ph-code text-base"></i>
+                        <span>匯出 JSON</span>
+                    </button>
+
+                    <!-- Clear Logs -->
+                    <button onclick="clearEventLogs()" class="flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-xl bg-surface-900 hover:bg-surface-800 border border-slate-800 text-slate-400 hover:text-white transition" title="清空日誌快取">
+                        <i class="ph-bold ph-trash text-sm"></i>
+                        <span>清空</span>
                     </button>
                 </div>
-                <div id="eventLogContainer" class="h-32 overflow-y-auto space-y-1 font-mono text-[11px] pr-1">
+
+                <!-- Event Stream Log Container -->
+                <div id="eventLogContainer" class="h-32 overflow-y-auto space-y-1 font-mono text-[11px] pr-1 bg-surface-950/60 rounded-xl p-2 border border-slate-800/80">
                     <div class="text-slate-600">[SYS] 系統已啟動，正在初始化 MediaPipe 視覺運算...</div>
                 </div>
             </div>
@@ -532,11 +574,17 @@
                 palm: { inZone: false, isTouching: false, z: 0, normX: 0, normY: 0 }
             },
             currentGesture: 'IDLE',
+            actionMode: '未操作',
             palmConfidence: 0,
             fps: 60,
             frameCount: 0,
             lastFrameTime: performance.now(),
-            simPhase: 0
+            simPhase: 0,
+            // Telemetry & Recording state
+            isLoggingTelemetry: true,
+            telemetryRecords: [],
+            lastContactCount: 0,
+            lastInZoneCount: 0
         };
 
         const videoEl = document.getElementById('webcamVideo');
@@ -548,6 +596,15 @@
         let currentStream = null;
         let cameraProcessingLoopId = null;
         let isSendingFrame = false;
+
+        // Telemetry & Video Recording variables
+        let rawEventLogs = [];
+        let mediaRecorder = null;
+        let recordedChunks = [];
+        let isRecordingVideo = false;
+        let recordingStartTime = 0;
+        let recordingTimerInterval = null;
+        let lastTelemetrySampleTime = 0;
 
         // ================= RESIZE CANVAS =================
         function resizeVisionCanvas() {
@@ -940,18 +997,28 @@
             }
 
             state.currentGesture = gesture;
+            state.actionMode = actionMode;
+            state.lastContactCount = contactCount;
+            state.lastInZoneCount = inZoneCount;
 
             // Update UI elements
             updateUI(contactCount, inZoneCount, isPalmTouching, actionMode);
+
+            // Record telemetry data frame
+            recordTelemetryFrame();
         }
 
         function resetHandState() {
             Object.keys(state.fingersStatus).forEach(k => {
-                state.fingersStatus[k] = { inZone: false, isTouching: false, isHovering: false, z: 0 };
+                state.fingersStatus[k] = { inZone: false, isTouching: false, isHovering: false, z: 0, normX: 0, normY: 0 };
             });
             state.currentGesture = '等待手部入鏡 (NO HAND)';
+            state.actionMode = '等待操作';
+            state.lastContactCount = 0;
+            state.lastInZoneCount = 0;
             state.palmConfidence = 0;
             updateUI(0, 0, false, '等待手部入鏡');
+            recordTelemetryFrame();
         }
 
         // ================= RENDERING LOOP =================
@@ -1380,20 +1447,425 @@
             }
         }
 
+        // ================= TELEMETRY RECORDING & EXPORT ENGINE =================
+        function recordTelemetryFrame() {
+            if (!state.isLoggingTelemetry) return;
+            const now = performance.now();
+            if (now - lastTelemetrySampleTime < 50) return; // Sample at ~20 Hz
+            lastTelemetrySampleTime = now;
+
+            const isoTime = new Date().toISOString();
+
+            const frame = {
+                timestamp: isoTime,
+                elapsedMs: Math.round(now),
+                gesture: state.currentGesture,
+                actionMode: state.actionMode,
+                contactCount: state.lastContactCount,
+                inZoneCount: state.lastInZoneCount,
+                palm: {
+                    inZone: !!state.fingersStatus.palm.inZone,
+                    isTouching: !!state.fingersStatus.palm.isTouching,
+                    z: Number((state.fingersStatus.palm.z || 0).toFixed(4)),
+                    confidence: state.palmConfidence
+                },
+                fingers: {
+                    thumb: {
+                        inZone: !!state.fingersStatus.thumb.inZone,
+                        isTouching: !!state.fingersStatus.thumb.isTouching,
+                        isHovering: !!state.fingersStatus.thumb.isHovering,
+                        z: Number((state.fingersStatus.thumb.z || 0).toFixed(4)),
+                        x: Number((state.fingersStatus.thumb.normX || 0).toFixed(4)),
+                        y: Number((state.fingersStatus.thumb.normY || 0).toFixed(4))
+                    },
+                    index: {
+                        inZone: !!state.fingersStatus.index.inZone,
+                        isTouching: !!state.fingersStatus.index.isTouching,
+                        isHovering: !!state.fingersStatus.index.isHovering,
+                        z: Number((state.fingersStatus.index.z || 0).toFixed(4)),
+                        x: Number((state.fingersStatus.index.normX || 0).toFixed(4)),
+                        y: Number((state.fingersStatus.index.normY || 0).toFixed(4))
+                    },
+                    middle: {
+                        inZone: !!state.fingersStatus.middle.inZone,
+                        isTouching: !!state.fingersStatus.middle.isTouching,
+                        isHovering: !!state.fingersStatus.middle.isHovering,
+                        z: Number((state.fingersStatus.middle.z || 0).toFixed(4)),
+                        x: Number((state.fingersStatus.middle.normX || 0).toFixed(4)),
+                        y: Number((state.fingersStatus.middle.normY || 0).toFixed(4))
+                    },
+                    ring: {
+                        inZone: !!state.fingersStatus.ring.inZone,
+                        isTouching: !!state.fingersStatus.ring.isTouching,
+                        isHovering: !!state.fingersStatus.ring.isHovering,
+                        z: Number((state.fingersStatus.ring.z || 0).toFixed(4)),
+                        x: Number((state.fingersStatus.ring.normX || 0).toFixed(4)),
+                        y: Number((state.fingersStatus.ring.normY || 0).toFixed(4))
+                    },
+                    pinky: {
+                        inZone: !!state.fingersStatus.pinky.inZone,
+                        isTouching: !!state.fingersStatus.pinky.isTouching,
+                        isHovering: !!state.fingersStatus.pinky.isHovering,
+                        z: Number((state.fingersStatus.pinky.z || 0).toFixed(4)),
+                        x: Number((state.fingersStatus.pinky.normX || 0).toFixed(4)),
+                        y: Number((state.fingersStatus.pinky.normY || 0).toFixed(4))
+                    }
+                }
+            };
+
+            state.telemetryRecords.push(frame);
+            if (state.telemetryRecords.length > 10000) {
+                state.telemetryRecords.shift();
+            }
+
+            const badge = document.getElementById('logRecordCountBadge');
+            if (badge) {
+                badge.textContent = `${state.telemetryRecords.length} 筆數據`;
+            }
+        }
+
+        function toggleTelemetryLogging() {
+            state.isLoggingTelemetry = !state.isLoggingTelemetry;
+            const dot = document.getElementById('logStatusDot');
+            const text = document.getElementById('textToggleLog');
+
+            if (state.isLoggingTelemetry) {
+                if (dot) dot.className = 'w-2 h-2 rounded-full bg-emerald-400 animate-pulse';
+                if (text) text.textContent = '記錄中';
+                showToast('數據採集已繼續');
+                appendEventLog('[LOG] 數據採集器已恢復記錄');
+            } else {
+                if (dot) dot.className = 'w-2 h-2 rounded-full bg-slate-500';
+                if (text) text.textContent = '已暫停';
+                showToast('數據採集已暫停');
+                appendEventLog('[LOG] 數據採集器已暫停記錄');
+            }
+        }
+
+        // ================= VIDEO SCREEN RECORDING =================
+        function getSupportedMimeType() {
+            const types = [
+                'video/webm;codecs=vp9',
+                'video/webm;codecs=vp8',
+                'video/webm',
+                'video/mp4'
+            ];
+            for (const t of types) {
+                if (window.MediaRecorder && MediaRecorder.isTypeSupported(t)) {
+                    return t;
+                }
+            }
+            return '';
+        }
+
+        function toggleVideoRecording() {
+            if (isRecordingVideo) {
+                stopVideoRecording();
+            } else {
+                startVideoRecording();
+            }
+        }
+
+        function startVideoRecording() {
+            if (!canvasEl.captureStream) {
+                showToast('您的瀏覽器不支援 Canvas 錄影功能');
+                return;
+            }
+
+            recordedChunks = [];
+            const stream = canvasEl.captureStream(30);
+            const mimeType = getSupportedMimeType();
+            const options = mimeType ? { mimeType } : {};
+
+            try {
+                mediaRecorder = new MediaRecorder(stream, options);
+            } catch (err) {
+                console.error('MediaRecorder start failed:', err);
+                showToast('錄影初始化失敗，請檢查瀏覽器安全性支援');
+                return;
+            }
+
+            mediaRecorder.ondataavailable = (e) => {
+                if (e.data && e.data.size > 0) {
+                    recordedChunks.push(e.data);
+                }
+            };
+
+            mediaRecorder.onstop = () => {
+                finishVideoDownload();
+            };
+
+            mediaRecorder.start(250); // Emit video chunks every 250ms
+            isRecordingVideo = true;
+            recordingStartTime = Date.now();
+
+            // Auto-enable telemetry logging if it was paused
+            if (!state.isLoggingTelemetry) {
+                toggleTelemetryLogging();
+            }
+
+            // Update UI
+            updateRecordingUI(true);
+
+            // Timer Interval
+            if (recordingTimerInterval) clearInterval(recordingTimerInterval);
+            recordingTimerInterval = setInterval(updateRecordingTimer, 1000);
+
+            appendEventLog('[REC] 視訊錄影已啟動，同步採集手部軌跡與觸控板感應數據...');
+            showToast('🔴 開始錄影！畫面與手勢數據將同步記錄');
+        }
+
+        function stopVideoRecording() {
+            if (!mediaRecorder || mediaRecorder.state === 'inactive') return;
+            mediaRecorder.stop();
+            isRecordingVideo = false;
+            if (recordingTimerInterval) {
+                clearInterval(recordingTimerInterval);
+                recordingTimerInterval = null;
+            }
+            updateRecordingUI(false);
+            appendEventLog('[REC] 錄影已結束，正在封裝影片檔...');
+        }
+
+        function updateRecordingTimer() {
+            if (!isRecordingVideo) return;
+            const elapsed = Math.floor((Date.now() - recordingStartTime) / 1000);
+            const mins = Math.floor(elapsed / 60).toString().padStart(2, '0');
+            const secs = (elapsed % 60).toString().padStart(2, '0');
+            const timeStr = `${mins}:${secs}`;
+
+            const recTimerText = document.getElementById('recTimerText');
+            if (recTimerText) recTimerText.textContent = timeStr;
+
+            const canvasRecTimer = document.getElementById('canvasRecTimer');
+            if (canvasRecTimer) canvasRecTimer.textContent = timeStr;
+        }
+
+        function updateRecordingUI(recording) {
+            const btn = document.getElementById('btnRecordVideo');
+            const recDot = document.getElementById('recDot');
+            const recBtnText = document.getElementById('recBtnText');
+            const recTimerText = document.getElementById('recTimerText');
+            const canvasRecIndicator = document.getElementById('canvasRecIndicator');
+
+            if (recording) {
+                if (btn) btn.className = 'flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 active:scale-95 border border-rose-400 text-white text-xs font-bold transition shadow-lg animate-pulse';
+                if (recDot) recDot.className = 'w-2.5 h-2.5 rounded-full bg-white animate-ping';
+                if (recBtnText) recBtnText.textContent = '停止';
+                if (recTimerText) recTimerText.classList.remove('hidden');
+                if (canvasRecIndicator) canvasRecIndicator.classList.remove('hidden');
+            } else {
+                if (btn) btn.className = 'flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 active:scale-95 border border-rose-500/40 text-rose-400 hover:text-rose-300 text-xs font-bold transition shadow';
+                if (recDot) recDot.className = 'w-2.5 h-2.5 rounded-full bg-rose-500';
+                if (recBtnText) recBtnText.textContent = '錄影';
+                if (recTimerText) recTimerText.classList.add('hidden');
+                if (canvasRecIndicator) canvasRecIndicator.classList.add('hidden');
+            }
+        }
+
+        function finishVideoDownload() {
+            if (recordedChunks.length === 0) {
+                showToast('錄影檔案為空');
+                return;
+            }
+            const mimeType = mediaRecorder.mimeType || 'video/webm';
+            const blob = new Blob(recordedChunks, { type: mimeType });
+            const ext = mimeType.includes('mp4') ? 'mp4' : 'webm';
+            const filename = `touchpad_video_${getTimestampFilename()}.${ext}`;
+
+            downloadBlob(blob, filename);
+
+            const durationSec = Math.round((Date.now() - recordingStartTime) / 1000);
+            showToast(`🎬 錄影檔案已下載！(${filename})`);
+            appendEventLog(`[REC] 影片已匯出下載: ${filename} (長度約 ${durationSec} 秒)`);
+        }
+
+        // ================= LOG EXPORT (CSV & JSON) =================
+        function exportLogAsCSV() {
+            if (state.telemetryRecords.length === 0) {
+                showToast('尚無日誌數據可匯出！');
+                return;
+            }
+
+            const headers = [
+                'Timestamp',
+                'ElapsedMs',
+                'Gesture',
+                'ActionMode',
+                'ContactFingers',
+                'InZoneCount',
+                'PalmTouching',
+                'PalmInZone',
+                'PalmConfidence',
+                'PalmZ',
+                'ThumbTouching',
+                'ThumbHovering',
+                'ThumbInZone',
+                'ThumbZ',
+                'ThumbX',
+                'ThumbY',
+                'IndexTouching',
+                'IndexHovering',
+                'IndexInZone',
+                'IndexZ',
+                'IndexX',
+                'IndexY',
+                'MiddleTouching',
+                'MiddleHovering',
+                'MiddleInZone',
+                'MiddleZ',
+                'MiddleX',
+                'MiddleY',
+                'RingTouching',
+                'RingHovering',
+                'RingInZone',
+                'RingZ',
+                'RingX',
+                'RingY',
+                'PinkyTouching',
+                'PinkyHovering',
+                'PinkyInZone',
+                'PinkyZ',
+                'PinkyX',
+                'PinkyY'
+            ];
+
+            const rows = state.telemetryRecords.map(r => [
+                `"${r.timestamp}"`,
+                r.elapsedMs,
+                `"${r.gesture}"`,
+                `"${r.actionMode}"`,
+                r.contactCount,
+                r.inZoneCount,
+                r.palm.isTouching ? 1 : 0,
+                r.palm.inZone ? 1 : 0,
+                r.palm.confidence,
+                r.palm.z,
+                r.fingers.thumb.isTouching ? 1 : 0,
+                r.fingers.thumb.isHovering ? 1 : 0,
+                r.fingers.thumb.inZone ? 1 : 0,
+                r.fingers.thumb.z,
+                r.fingers.thumb.x,
+                r.fingers.thumb.y,
+                r.fingers.index.isTouching ? 1 : 0,
+                r.fingers.index.isHovering ? 1 : 0,
+                r.fingers.index.inZone ? 1 : 0,
+                r.fingers.index.z,
+                r.fingers.index.x,
+                r.fingers.index.y,
+                r.fingers.middle.isTouching ? 1 : 0,
+                r.fingers.middle.isHovering ? 1 : 0,
+                r.fingers.middle.inZone ? 1 : 0,
+                r.fingers.middle.z,
+                r.fingers.middle.x,
+                r.fingers.middle.y,
+                r.fingers.ring.isTouching ? 1 : 0,
+                r.fingers.ring.isHovering ? 1 : 0,
+                r.fingers.ring.inZone ? 1 : 0,
+                r.fingers.ring.z,
+                r.fingers.ring.x,
+                r.fingers.ring.y,
+                r.fingers.pinky.isTouching ? 1 : 0,
+                r.fingers.pinky.isHovering ? 1 : 0,
+                r.fingers.pinky.inZone ? 1 : 0,
+                r.fingers.pinky.z,
+                r.fingers.pinky.x,
+                r.fingers.pinky.y
+            ].join(','));
+
+            // Prepend UTF-8 BOM for Microsoft Excel compatibility
+            const csvContent = '\uFEFF' + headers.join(',') + '\n' + rows.join('\n');
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const filename = `touchpad_telemetry_${getTimestampFilename()}.csv`;
+
+            downloadBlob(blob, filename);
+            appendEventLog(`[EXPORT] 已匯出 CSV 檔案: ${filename} (共 ${state.telemetryRecords.length} 筆)`);
+            showToast(`📊 已成功匯出 CSV 檔案！共 ${state.telemetryRecords.length} 筆數據`);
+        }
+
+        function exportLogAsJSON() {
+            if (state.telemetryRecords.length === 0 && rawEventLogs.length === 0) {
+                showToast('尚無日誌數據可匯出！');
+                return;
+            }
+
+            const payload = {
+                appName: 'Touchpad Palm Vision Lab',
+                exportTime: new Date().toISOString(),
+                config: {
+                    touchDepthThreshold: config.touchDepthThreshold,
+                    palmDepthThreshold: config.palmDepthThreshold,
+                    surfaceBaselineZ: config.surfaceBaselineZ,
+                    isMirrored: config.isMirrored,
+                    padRegion: state.padRegion
+                },
+                device: {
+                    cameraIndex: state.currentCameraIndex,
+                    cameraLabel: state.availableCameras[state.currentCameraIndex]?.label || 'Default Camera',
+                    sourceMode: state.sourceMode
+                },
+                totalTelemetryFrames: state.telemetryRecords.length,
+                totalEventLogs: rawEventLogs.length,
+                telemetryData: state.telemetryRecords,
+                eventLogs: rawEventLogs
+            };
+
+            const jsonStr = JSON.stringify(payload, null, 2);
+            const blob = new Blob([jsonStr], { type: 'application/json;charset=utf-8;' });
+            const filename = `touchpad_telemetry_${getTimestampFilename()}.json`;
+
+            downloadBlob(blob, filename);
+            appendEventLog(`[EXPORT] 已匯出 JSON 檔案: ${filename}`);
+            showToast(`📥 已成功匯出 JSON 完整數據檔案！`);
+        }
+
+        function downloadBlob(blob, filename) {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            setTimeout(() => {
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            }, 1000);
+        }
+
+        function getTimestampFilename() {
+            const d = new Date();
+            const pad = (n) => n.toString().padStart(2, '0');
+            return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
+        }
+
         function appendEventLog(msg) {
             const container = document.getElementById('eventLogContainer');
+            if (!container) return;
             const row = document.createElement('div');
-            const time = new Date().toTimeString().split(' ')[0] + '.' + Math.floor(performance.now() % 1000).toString().padStart(3, '0');
+            const now = new Date();
+            const time = now.toTimeString().split(' ')[0] + '.' + Math.floor(performance.now() % 1000).toString().padStart(3, '0');
             row.innerHTML = `<span class="text-slate-500">[${time}]</span> ${msg}`;
             container.prepend(row);
 
-            while (container.children.length > 50) {
+            rawEventLogs.push({
+                time: now.toISOString(),
+                message: msg
+            });
+            if (rawEventLogs.length > 500) rawEventLogs.shift();
+
+            while (container.children.length > 60) {
                 container.removeChild(container.lastChild);
             }
         }
 
         function clearEventLogs() {
-            document.getElementById('eventLogContainer').innerHTML = '<div class="text-slate-600">[SYS] 日誌已清空...</div>';
+            rawEventLogs = [];
+            state.telemetryRecords = [];
+            const badge = document.getElementById('logRecordCountBadge');
+            if (badge) badge.textContent = '0 筆數據';
+            const container = document.getElementById('eventLogContainer');
+            if (container) container.innerHTML = '<div class="text-slate-600">[SYS] 日誌與數據已清空...</div>';
+            showToast('已清空日誌與暫存數據');
         }
 
         function showToast(msg) {
