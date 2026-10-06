@@ -1,0 +1,17 @@
+{
+  "name": "Touchpad Palm Visualizer — 即時觸控板手指與手掌分析儀",
+  "short_name": "TouchpadVisualizer",
+  "description": "即時偵測與分析觸控板手指接觸點、手掌大面積置放、幾何形狀與手勢手感遙測系統",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#060A12",
+  "theme_color": "#00F0FF",
+  "icons": [
+    {
+      "src": "./icon-512.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
