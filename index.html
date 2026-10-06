@@ -117,13 +117,27 @@
                 <div class="inline-flex p-1 rounded-xl bg-surface-900 border border-slate-800 shrink-0 text-xs">
                     <button id="btnSourceCam" onclick="switchSourceMode('webcam')" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold transition-all bg-neon-cyan text-slate-950 shadow">
                         <i class="ph-bold ph-webcam text-sm"></i>
-                        <span>啟動鏡頭</span>
+                        <span>實體鏡頭</span>
                     </button>
                     <button id="btnSourceSim" onclick="switchSourceMode('sim')" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold transition-all text-slate-300 hover:text-white">
                         <i class="ph-bold ph-robot text-sm text-neon-lime"></i>
                         <span>AI 模擬演示</span>
                     </button>
                 </div>
+
+                <!-- Camera Selection Dropdown (Desktop / Tablet) -->
+                <div class="hidden md:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-surface-900 border border-slate-800 text-xs shadow-inner">
+                    <i class="ph-bold ph-video-camera text-neon-cyan text-sm shrink-0"></i>
+                    <select id="cameraSelect" onchange="changeCamera(this.value)" class="bg-transparent text-xs text-slate-200 font-bold focus:outline-none max-w-[150px] truncate cursor-pointer" title="切換視訊鏡頭">
+                        <option value="">偵測鏡頭中...</option>
+                    </select>
+                </div>
+
+                <!-- Quick Switch Camera Button (All devices) -->
+                <button id="btnSwitchCamera" onclick="cycleNextCamera()" class="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-surface-800 hover:bg-surface-700 active:scale-95 border border-slate-700 text-neon-cyan hover:text-white text-xs font-bold transition shadow" title="切換下一個鏡頭 (支援外接/俯拍/前置/後置鏡頭)">
+                    <i class="ph-bold ph-arrows-clockwise text-base"></i>
+                    <span class="hidden sm:inline">切換鏡頭</span>
+                </button>
 
                 <!-- Mirror Video Toggle -->
                 <button id="btnMirror" onclick="toggleMirror()" class="p-2 rounded-xl bg-surface-800 hover:bg-surface-700 border border-slate-700 text-slate-300 transition" title="水平翻轉鏡頭 (鏡像)">
@@ -182,14 +196,19 @@
                     <canvas id="visionCanvas" class="w-full h-full block object-cover"></canvas>
 
                     <!-- Top-Left Camera Status Overlay -->
-                    <div class="absolute top-3 left-3 pointer-events-none z-10 flex flex-wrap items-center gap-2 text-[11px] font-mono">
-                        <div class="px-2.5 py-1 rounded-xl bg-black/85 backdrop-blur-md border border-white/10 text-slate-300 flex items-center gap-1.5 shadow">
+                    <div class="absolute top-3 left-3 z-10 flex flex-wrap items-center gap-2 text-[11px] font-mono">
+                        <div class="px-2.5 py-1 rounded-xl bg-black/85 backdrop-blur-md border border-white/10 text-slate-300 flex items-center gap-1.5 shadow pointer-events-none">
                             <i class="ph-bold ph-lightning text-neon-lime"></i>
                             <span id="fpsCounter">60 FPS</span>
                         </div>
-                        <div id="handSideBadge" class="px-2.5 py-1 rounded-xl bg-black/85 backdrop-blur-md border border-white/10 text-neon-cyan flex items-center gap-1.5 shadow">
+                        <div id="handSideBadge" class="px-2.5 py-1 rounded-xl bg-black/85 backdrop-blur-md border border-white/10 text-neon-cyan flex items-center gap-1.5 shadow pointer-events-none">
                             右手 (RIGHT HAND)
                         </div>
+                        <!-- Canvas Quick Camera Switcher Pill -->
+                        <button onclick="cycleNextCamera()" class="px-2.5 py-1 rounded-xl bg-black/85 hover:bg-surface-800 active:scale-95 backdrop-blur-md border border-neon-cyan/40 hover:border-neon-cyan text-neon-cyan flex items-center gap-1.5 shadow cursor-pointer transition select-none" title="點擊切換鏡頭">
+                            <i class="ph-bold ph-arrows-clockwise text-xs"></i>
+                            <span id="camCurrentLabelBadge" class="max-w-[120px] truncate">偵測鏡頭中...</span>
+                        </button>
                     </div>
 
                     <!-- Top-Right Live Gesture HUD Card -->
@@ -434,6 +453,18 @@
             </div>
 
             <div class="mt-4 space-y-4 text-xs">
+                <!-- Camera Device Selection -->
+                <div>
+                    <div class="flex justify-between mb-1">
+                        <span class="text-slate-300 font-bold">視訊鏡頭裝置 (Camera Device)</span>
+                        <span id="labelCurrentCameraCount" class="font-mono text-neon-cyan font-bold">偵測中...</span>
+                    </div>
+                    <select id="modalCameraSelect" onchange="changeCamera(this.value)" class="w-full px-3 py-2 rounded-xl bg-surface-900 border border-slate-700 text-slate-200 text-xs focus:outline-none focus:border-neon-cyan cursor-pointer">
+                        <option value="">偵測鏡頭中...</option>
+                    </select>
+                    <span class="text-[10px] text-slate-500 mt-1 block">可切換筆電內建鏡頭、USB 外接俯拍鏡頭或手機前/後鏡頭</span>
+                </div>
+
                 <div>
                     <div class="flex justify-between mb-1">
                         <span class="text-slate-300 font-bold">接觸深度門檻 (Touch Depth Threshold)</span>
@@ -481,6 +512,9 @@
         const state = {
             sourceMode: 'webcam', // 'webcam' | 'sim'
             cameraActive: false,
+            selectedDeviceId: localStorage.getItem('touchpad_vision_cam_id') || '',
+            availableCameras: [],
+            currentCameraIndex: 0,
             padRegion: {
                 // Normalized (0~1) bounding box of physical trackpad on camera feed
                 x: 0.22,
@@ -510,8 +544,10 @@
         const ctx = canvasEl.getContext('2d');
         const viewportContainer = document.getElementById('viewportContainer');
 
-        let cameraInstance = null;
         let handsModel = null;
+        let currentStream = null;
+        let cameraProcessingLoopId = null;
+        let isSendingFrame = false;
 
         // ================= RESIZE CANVAS =================
         function resizeVisionCanvas() {
@@ -522,6 +558,242 @@
             ctx.scale(dpr, dpr);
         }
         window.addEventListener('resize', resizeVisionCanvas);
+
+        // ================= CAMERA & DEVICE MANAGEMENT =================
+        async function refreshCameraList() {
+            if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) return;
+            try {
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                const videoInputs = devices.filter(d => d.kind === 'videoinput');
+                state.availableCameras = videoInputs;
+
+                const headerSelect = document.getElementById('cameraSelect');
+                const modalSelect = document.getElementById('modalCameraSelect');
+                const labelCount = document.getElementById('labelCurrentCameraCount');
+
+                if (labelCount) {
+                    labelCount.textContent = `${videoInputs.length} 個可用`;
+                }
+
+                const populate = (selectEl) => {
+                    if (!selectEl) return;
+                    selectEl.innerHTML = '';
+                    if (videoInputs.length === 0) {
+                        const opt = document.createElement('option');
+                        opt.value = '';
+                        opt.textContent = '未偵測到鏡頭';
+                        selectEl.appendChild(opt);
+                        return;
+                    }
+
+                    videoInputs.forEach((cam, idx) => {
+                        const opt = document.createElement('option');
+                        opt.value = cam.deviceId;
+                        const label = cam.label || `攝影機 ${idx + 1} (${cam.deviceId ? cam.deviceId.slice(0, 6) : 'ID'}...)`;
+                        opt.textContent = label;
+                        if (cam.deviceId === state.selectedDeviceId) {
+                            opt.selected = true;
+                            state.currentCameraIndex = idx;
+                        }
+                        selectEl.appendChild(opt);
+                    });
+                };
+
+                populate(headerSelect);
+                populate(modalSelect);
+                updateCameraBadgeLabel();
+            } catch (err) {
+                console.warn('refreshCameraList error:', err);
+            }
+        }
+
+        async function startWebcamStream(targetDeviceId = null) {
+            if (state.sourceMode !== 'webcam') return;
+
+            stopWebcamStream();
+
+            const deviceIdToUse = targetDeviceId || state.selectedDeviceId || null;
+            const videoConstraints = {
+                width: { ideal: 1280 },
+                height: { ideal: 720 }
+            };
+
+            if (deviceIdToUse) {
+                videoConstraints.deviceId = { exact: deviceIdToUse };
+            } else {
+                videoConstraints.facingMode = { ideal: 'environment' };
+            }
+
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: videoConstraints,
+                    audio: false
+                });
+
+                currentStream = stream;
+                videoEl.srcObject = stream;
+                await videoEl.play();
+                state.cameraActive = true;
+
+                const track = stream.getVideoTracks()[0];
+                if (track) {
+                    const settings = track.getSettings();
+                    if (settings.deviceId) {
+                        state.selectedDeviceId = settings.deviceId;
+                        localStorage.setItem('touchpad_vision_cam_id', settings.deviceId);
+                    }
+                    const trackLabel = track.label || '視訊鏡頭';
+                    appendEventLog(`[SYS] 鏡頭已連通: ${trackLabel}`);
+                    showToast(`📷 目前鏡頭: ${trackLabel}`);
+                }
+
+                // Refresh cameras with updated permissions / labels
+                await refreshCameraList();
+
+                // Start processing video frames for MediaPipe Hands
+                startCameraProcessingLoop();
+
+            } catch (err) {
+                console.warn('Start camera with constraint failed:', err);
+                // Fallback to any camera without exact deviceId constraint
+                if (deviceIdToUse) {
+                    appendEventLog('[WARN] 切換指定鏡頭失敗，嘗試切換至預設鏡頭...');
+                    try {
+                        const fallbackStream = await navigator.mediaDevices.getUserMedia({
+                            video: { width: { ideal: 1280 }, height: { ideal: 720 } },
+                            audio: false
+                        });
+                        currentStream = fallbackStream;
+                        videoEl.srcObject = fallbackStream;
+                        await videoEl.play();
+                        state.cameraActive = true;
+
+                        const track = fallbackStream.getVideoTracks()[0];
+                        if (track && track.getSettings().deviceId) {
+                            state.selectedDeviceId = track.getSettings().deviceId;
+                            localStorage.setItem('touchpad_vision_cam_id', state.selectedDeviceId);
+                        }
+                        await refreshCameraList();
+                        startCameraProcessingLoop();
+                        return;
+                    } catch (fallbackErr) {
+                        console.error('Fallback camera error:', fallbackErr);
+                    }
+                }
+
+                appendEventLog('[WARN] 無法存取攝影機，請檢查瀏覽器權限或切換至 AI 模擬模式');
+                showToast('無法存取攝影機，切換至 AI 模擬模式');
+                switchSourceMode('sim');
+            }
+        }
+
+        function stopWebcamStream() {
+            if (cameraProcessingLoopId) {
+                cancelAnimationFrame(cameraProcessingLoopId);
+                cameraProcessingLoopId = null;
+            }
+            if (currentStream) {
+                try {
+                    currentStream.getTracks().forEach(t => t.stop());
+                } catch (e) {}
+                currentStream = null;
+            }
+            if (videoEl.srcObject) {
+                videoEl.srcObject = null;
+            }
+            state.cameraActive = false;
+        }
+
+        function startCameraProcessingLoop() {
+            if (cameraProcessingLoopId) {
+                cancelAnimationFrame(cameraProcessingLoopId);
+                cameraProcessingLoopId = null;
+            }
+
+            async function frameLoop() {
+                if (state.sourceMode === 'webcam' && state.cameraActive && videoEl.readyState >= 2) {
+                    if (!isSendingFrame && handsModel) {
+                        isSendingFrame = true;
+                        try {
+                            await handsModel.send({ image: videoEl });
+                        } catch (e) {
+                            // non-fatal send frame error
+                        } finally {
+                            isSendingFrame = false;
+                        }
+                    }
+                }
+                if (state.cameraActive && state.sourceMode === 'webcam') {
+                    cameraProcessingLoopId = requestAnimationFrame(frameLoop);
+                }
+            }
+
+            cameraProcessingLoopId = requestAnimationFrame(frameLoop);
+        }
+
+        async function changeCamera(deviceId) {
+            if (!deviceId) return;
+            state.selectedDeviceId = deviceId;
+            const idx = state.availableCameras.findIndex(c => c.deviceId === deviceId);
+            if (idx !== -1) {
+                state.currentCameraIndex = idx;
+            }
+            updateCameraBadgeLabel();
+
+            if (state.sourceMode !== 'webcam') {
+                switchSourceMode('webcam');
+            } else {
+                await startWebcamStream(deviceId);
+            }
+        }
+
+        async function cycleNextCamera() {
+            if (state.sourceMode !== 'webcam') {
+                switchSourceMode('webcam');
+                return;
+            }
+
+            if (state.availableCameras.length <= 1) {
+                await refreshCameraList();
+            }
+
+            if (state.availableCameras.length <= 1) {
+                showToast('目前僅偵測到 1 個鏡頭裝置');
+                return;
+            }
+
+            state.currentCameraIndex = (state.currentCameraIndex + 1) % state.availableCameras.length;
+            const nextCam = state.availableCameras[state.currentCameraIndex];
+            state.selectedDeviceId = nextCam.deviceId;
+
+            const headerSelect = document.getElementById('cameraSelect');
+            if (headerSelect) headerSelect.value = nextCam.deviceId;
+            const modalSelect = document.getElementById('modalCameraSelect');
+            if (modalSelect) modalSelect.value = nextCam.deviceId;
+
+            updateCameraBadgeLabel();
+            appendEventLog(`[SYS] 正在切換至鏡頭: ${nextCam.label || '鏡頭 ' + (state.currentCameraIndex + 1)}`);
+            await startWebcamStream(nextCam.deviceId);
+        }
+
+        function updateCameraBadgeLabel() {
+            const badge = document.getElementById('camCurrentLabelBadge');
+            if (!badge) return;
+            if (state.availableCameras.length === 0) {
+                badge.textContent = '鏡頭';
+                return;
+            }
+            const current = state.availableCameras[state.currentCameraIndex];
+            const name = current ? (current.label || `鏡頭 ${state.currentCameraIndex + 1}`) : `鏡頭 ${state.currentCameraIndex + 1}`;
+            badge.textContent = name;
+        }
+
+        if (navigator.mediaDevices && navigator.mediaDevices.addEventListener) {
+            navigator.mediaDevices.addEventListener('devicechange', async () => {
+                appendEventLog('[SYS] 偵測到攝影機硬體插拔，重新掃描裝置...');
+                await refreshCameraList();
+            });
+        }
 
         // ================= MEDIAPIPE HANDS SETUP =================
         async function initMediaPipeHands() {
@@ -539,33 +811,11 @@
 
                 handsModel.onResults(onHandResults);
 
-                // Start webcam
-                startWebcamStream();
+                // Start webcam with selected or default camera
+                await startWebcamStream(state.selectedDeviceId);
             } catch (err) {
                 console.warn('MediaPipe Hands load warning, switching to simulation:', err);
-                appendEventLog('[WARN] 鏡頭載入異常，切換至 AI 模擬演示模式');
-                switchSourceMode('sim');
-            }
-        }
-
-        async function startWebcamStream() {
-            try {
-                cameraInstance = new Camera(videoEl, {
-                    onFrame: async () => {
-                        if (state.sourceMode === 'webcam') {
-                            await handsModel.send({ image: videoEl });
-                        }
-                    },
-                    width: 1280,
-                    height: 720
-                });
-                await cameraInstance.start();
-                state.cameraActive = true;
-                appendEventLog('[SYS] 鏡頭串流已連通，AI 手部追蹤啟動中...');
-                showToast('📷 鏡頭已成功啟動！請將鏡頭對準手部與觸控板');
-            } catch (err) {
-                console.error('Camera start error:', err);
-                appendEventLog('[WARN] 無法存取攝影機，自動切換至 AI 模擬模式');
+                appendEventLog('[WARN] 視覺核心載入異常，切換至 AI 模擬演示模式');
                 switchSourceMode('sim');
             }
         }
@@ -1086,11 +1336,16 @@
                 btnCam.className = 'flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold transition-all bg-neon-cyan text-slate-950 shadow';
                 btnSim.className = 'flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold transition-all text-slate-300 hover:text-white';
                 appendEventLog('[MODE] 切換至實體鏡頭拍攝模式');
-                if (!state.cameraActive) startWebcamStream();
+                if (!state.cameraActive) {
+                    startWebcamStream(state.selectedDeviceId);
+                } else {
+                    startCameraProcessingLoop();
+                }
             } else {
                 btnSim.className = 'flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold transition-all bg-neon-lime text-slate-950 shadow';
                 btnCam.className = 'flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold transition-all text-slate-300 hover:text-white';
                 appendEventLog('[MODE] 切換至 AI 模擬演示模式');
+                stopWebcamStream();
             }
         }
 
